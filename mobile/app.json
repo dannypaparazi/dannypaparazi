@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "ScannerApp",
+    "slug": "scanner-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.borneomotors.scannerapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ScannerApp uses the camera to scan QR codes and barcodes on device labels to capture model and serial numbers."
+      }
+    },
+    "android": {
+      "package": "com.borneomotors.scannerapp",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow ScannerApp to access your camera to scan device labels."
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "scanner-app-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:init": "node -r dotenv/config scripts/init-db.mjs dotenv_config_path=.env.local"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "next": "^16.3.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "16.3.5",
+    "typescript": "^5.4.5"
+  }
+}
