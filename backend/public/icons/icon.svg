@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#0d6efd" />
+
+  <!-- QR finder-pattern corners -->
+  <g fill="#ffffff">
+    <!-- top-left -->
+    <rect x="64" y="64" width="140" height="140" rx="24" />
+    <rect x="92" y="92" width="84" height="84" rx="14" fill="#0d6efd" />
+    <rect x="120" y="120" width="28" height="28" rx="6" fill="#ffffff" />
+    <!-- top-right -->
+    <rect x="308" y="64" width="140" height="140" rx="24" />
+    <rect x="336" y="92" width="84" height="84" rx="14" fill="#0d6efd" />
+    <rect x="364" y="120" width="28" height="28" rx="6" fill="#ffffff" />
+    <!-- bottom-left -->
+    <rect x="64" y="308" width="140" height="140" rx="24" />
+    <rect x="92" y="336" width="84" height="84" rx="14" fill="#0d6efd" />
+    <rect x="120" y="364" width="28" height="28" rx="6" fill="#ffffff" />
+  </g>
+
+  <!-- scattered data modules, bottom-right -->
+  <g fill="#ffffff">
+    <rect x="316" y="316" width="28" height="28" rx="6" />
+    <rect x="356" y="316" width="28" height="28" rx="6" />
+    <rect x="396" y="316" width="28" height="28" rx="6" />
+    <rect x="316" y="356" width="28" height="28" rx="6" />
+    <rect x="396" y="356" width="28" height="28" rx="6" />
+    <rect x="356" y="396" width="28" height="28" rx="6" />
+    <rect x="396" y="396" width="28" height="28" rx="6" />
+  </g>
+</svg>

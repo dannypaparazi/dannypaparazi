@@ -1,52 +1,61 @@
 # ScannerApp
 
-A device-registration app: scan a QR code or barcode on a piece of equipment with
-your phone's camera, confirm the model no. / serial no., and save it to a cloud
-database.
+A device-registration app with two parts, both web-based, in one Next.js app:
+
+- **Admin panel** (`/`) — table of scanned items: brand, model no., serial no.,
+  scan type, and timestamp.
+- **Scanner** (`/scan`) — opens the phone's camera in the browser and identifies
+  a device by either:
+  - **QR code recognition** (decoded client-side with [jsQR](https://github.com/cozmo/jsQR)), or
+  - **OCR of a printed label** (recognized client-side with [Tesseract.js](https://github.com/naptha/tesseract.js)), for devices with no QR code.
+
+  Whichever matched, the recognized text is parsed for brand / model no. /
+  serial no. (`lib/parseScan.ts`), shown in an editable confirm form (plus the
+  raw recognized text for reference), and POSTed to the admin panel's API to
+  be saved with a server-generated timestamp.
+- **Install** (`/install`) — a QR code (pointing at `/scan`) plus iPhone/Android
+  instructions for adding the scanner to the home screen as an installable app
+  (a PWA — no app store). See "Installing on a phone" below.
 
 ## Structure
 
 ```
 ScannerApp/
-├── mobile/    Expo (React Native) app — runs on Android and iOS
-└── backend/   Next.js app (API + dashboard) — deployed to Vercel, backed by Vercel Postgres (Neon)
+└── backend/   Next.js app — admin panel + scanner + API, deployed to Vercel, backed by Neon Postgres
 ```
 
-The mobile app is a native app (installed via Expo Go for dev, or a built binary
-for production) — it is not deployed to Vercel. Only `backend/` is deployed to
-Vercel; it exposes the API the mobile app talks to, and a small web dashboard for
-browsing saved scans.
+There's a single app because both parts are web pages sharing the same API and
+database — no separate mobile build. (An earlier version of this project used
+a native Expo/React Native app for the scanner; that's been replaced by the
+in-browser scanner described above.)
 
-## How scanning works
+## How recognition works
 
-The camera reads any QR code or barcode (QR, Code128, EAN-13, PDF417, Data Matrix,
-etc. — see `mobile/src/screens/ScannerScreen.tsx`) and treats its payload as plain
-text. That text is run through `mobile/src/lib/parseScan.ts`, which tries, in order:
+`lib/parseScan.ts` takes whatever text was recognized (QR payload or OCR
+output) and tries, in order:
 
-1. JSON payloads with a `model`/`serial` field (any common key spelling)
-2. Labeled text like `MODEL: ABC-123 S/N: XYZ-789` or `M/N ABC-123, SN XYZ-789`
-3. Two values separated by a comma, pipe, semicolon, or newline
+1. JSON payloads with `brand`/`model`/`serial` fields (any common key spelling)
+2. Labeled text like `BRAND: Acme MODEL: ABC-123 S/N: XYZ-789` or `M/N ABC-123 SN XYZ-789`
+3. Three (or two) values separated by a comma, pipe, semicolon, or newline —
+   brand, model, serial in that order
 4. Falls back to putting the raw text in the model field for manual correction
 
-The confirm screen always shows editable fields pre-filled with the parsed guess,
-plus the raw scanned text, so a bad guess is a quick edit rather than a dead end.
+The confirm screen always shows editable brand/model/serial fields pre-filled
+with the parsed guess, plus the raw recognized text, so a bad guess is a quick
+edit rather than a dead end.
 
-> If your devices actually need OCR of printed text with **no** barcode present
-> (rather than any barcode/QR whose payload is plain text), say so — that needs a
-> different, heavier native module (on-device text recognition) and isn't what's
-> scaffolded here.
-
-## Backend setup
+## Setup
 
 ```bash
 cd backend
 npm install
 ```
 
-1. Create a Postgres database from the Vercel dashboard (Storage → Postgres, which
-   runs on Neon) and link it to this project, or run `vercel link` then
+1. Create a Postgres database from the Vercel dashboard (Storage → Postgres,
+   which runs on Neon) and link it to this project, or run `vercel link` then
    `vercel env pull .env.local` to pull the connection string down locally.
-2. Initialize the schema (creates the `scans` table):
+2. Initialize the schema (creates the `scans` table, and is safe to re-run —
+   it adds any missing columns to an existing table):
    ```bash
    npm run db:init
    ```
@@ -54,38 +63,35 @@ npm install
    ```bash
    npm run dev
    ```
-   The dashboard is at `http://localhost:3000`, the API at `http://localhost:3000/api/scans`.
+   Dev server: `http://localhost:3006` (admin panel at `/`, scanner at `/scan`,
+   API at `/api/scans`). Camera access needs HTTPS or `localhost` — on a phone,
+   use a tunnel (e.g. `ngrok http 3006`) or the deployed Vercel URL, since a
+   phone can't reach your laptop's `localhost`.
 
-### Deploying
+### Deploying (live = Vercel)
 
-In the Vercel project settings, set **Root Directory** to `backend` (this repo is
-a monorepo — Vercel needs to know which subfolder to build). Push to your Git
-remote and import the repo in Vercel, or run `vercel --cwd backend`.
+In the Vercel project settings, set **Root Directory** to `backend` (this repo
+is a monorepo — Vercel needs to know which subfolder to build). Push to your
+Git remote and import the repo in Vercel, or run `vercel --cwd backend`.
 
-## Mobile app setup
+## Installing on a phone
 
-```bash
-cd mobile
-npm install
-npx expo install   # aligns native dependency versions with your Expo SDK
-```
+Open `/install` (linked from the admin panel and the scanner). It shows a QR
+code that points at `/scan` on whatever host served the page — localhost in
+dev, the actual domain once deployed — plus steps for both platforms:
 
-Point the app at your backend (defaults to `http://localhost:3000` for the
-simulator):
+- **iPhone**: Safari → Share → **Add to Home Screen**.
+- **Android**: Chrome → **Install app** banner or ⋮ menu → **Install app**.
 
-```bash
-EXPO_PUBLIC_API_URL=https://your-backend.vercel.app npx expo start
-```
-
-Scan the QR code with Expo Go (Android) or the Camera app (iOS) to run it on a
-physical device, or press `a` / `i` for an emulator/simulator.
-
-> Note: iOS Simulator and Android Emulator cameras only show a black screen or a
-> test pattern — to actually test scanning, use a physical device with Expo Go,
-> or a photo of a QR code held up to a webcam-backed simulator camera.
+This works via a standard [Web App Manifest](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest)
+(`app/manifest.ts`) plus a minimal service worker (`public/sw.js`) that caches
+the app shell and always goes to the network for `/api/*`. The result is a
+home-screen icon that opens full-screen (`display: standalone`), no app store
+involved — same web app, just installed.
 
 ## API
 
-- `POST /api/scans` — body `{ modelNo, serialNo, rawScan, scanType }` → creates a
-  scan record, returns it with `id` and `createdAt`.
+- `POST /api/scans` — body `{ brand, modelNo, serialNo, rawScan, scanType }`
+  (`brand` optional) → creates a scan record, returns it with `id` and
+  `createdAt`.
 - `GET /api/scans?limit=50` — returns the most recent scans, newest first.

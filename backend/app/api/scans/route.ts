@@ -3,6 +3,7 @@ import { sql } from '@/lib/db';
 
 interface ScanRow {
   id: number;
+  brand: string | null;
   model_no: string;
   serial_no: string;
   raw_scan: string | null;
@@ -13,6 +14,7 @@ interface ScanRow {
 function toScan(row: ScanRow) {
   return {
     id: row.id,
+    brand: row.brand,
     modelNo: row.model_no,
     serialNo: row.serial_no,
     rawScan: row.raw_scan,
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number(limitParam) || 50, 1), 200);
 
   const rows = (await sql`
-    SELECT id, model_no, serial_no, raw_scan, scan_type, created_at
+    SELECT id, brand, model_no, serial_no, raw_scan, scan_type, created_at
     FROM scans
     ORDER BY created_at DESC
     LIMIT ${limit}
@@ -45,6 +47,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const brand = typeof body.brand === 'string' && body.brand.trim() ? body.brand.trim() : null;
   const modelNo = body.modelNo.trim();
   const serialNo = body.serialNo.trim();
   const rawScan = typeof body.rawScan === 'string' ? body.rawScan : null;
@@ -58,9 +61,9 @@ export async function POST(request: NextRequest) {
   }
 
   const rows = (await sql`
-    INSERT INTO scans (model_no, serial_no, raw_scan, scan_type)
-    VALUES (${modelNo}, ${serialNo}, ${rawScan}, ${scanType})
-    RETURNING id, model_no, serial_no, raw_scan, scan_type, created_at
+    INSERT INTO scans (brand, model_no, serial_no, raw_scan, scan_type)
+    VALUES (${brand}, ${modelNo}, ${serialNo}, ${rawScan}, ${scanType})
+    RETURNING id, brand, model_no, serial_no, raw_scan, scan_type, created_at
   `) as ScanRow[];
 
   return NextResponse.json(toScan(rows[0]), { status: 201 });
