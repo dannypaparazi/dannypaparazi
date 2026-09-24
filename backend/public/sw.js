@@ -1,5 +1,19 @@
-const CACHE_NAME = 'scannerapp-shell-v1';
-const APP_SHELL = ['/', '/scan', '/manifest.webmanifest'];
+const CACHE_NAME = 'scannerapp-shell-v2';
+
+// Only the installable scanner shell and its static assets are cached.
+// The admin dashboard and install page render live data on every request
+// and must never be served stale.
+const APP_SHELL = ['/scan', '/manifest.webmanifest'];
+
+function isCacheable(pathname) {
+  return (
+    pathname === '/scan' ||
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/icon.svg' ||
+    pathname === '/apple-icon.png' ||
+    pathname.startsWith('/icons/')
+  );
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -15,14 +29,15 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Stale-while-revalidate for the app shell; API calls always go straight to
-// the network so scan data is never served stale.
+// Stale-while-revalidate, but only for the cacheable set above. Everything
+// else (the dashboard, /install, /api/*) bypasses the service worker
+// entirely and always goes straight to the network.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.pathname.startsWith('/api/')) return;
+  if (!isCacheable(url.pathname)) return;
 
   event.respondWith(
     caches.match(request).then((cached) => {

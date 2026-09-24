@@ -5,8 +5,14 @@ import Link from 'next/link';
 import jsQR from 'jsqr';
 import type { Worker } from 'tesseract.js';
 import { parseScan, type ParsedScan } from '@/lib/parseScan';
+import { getDeviceId } from '@/lib/deviceId';
 
 type Phase = 'starting' | 'scanning' | 'recognizing' | 'confirm' | 'camera-error';
+
+interface Coords {
+  latitude: number;
+  longitude: number;
+}
 
 const QR_SCAN_INTERVAL_MS = 300;
 
@@ -31,6 +37,33 @@ export default function ScannerScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  const [deviceId] = useState(() => getDeviceId());
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const requestLocation = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      setLocationError('Location is not available in this browser.');
+      setCoords(null);
+      return;
+    }
+    setLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocating(false);
+      },
+      (err) => {
+        setLocationError(err.message || 'Could not get location.');
+        setCoords(null);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  }, []);
+
   const stopQrLoop = useCallback(() => {
     if (qrIntervalRef.current) {
       clearInterval(qrIntervalRef.current);
@@ -38,17 +71,23 @@ export default function ScannerScreen() {
     }
   }, []);
 
-  const applyParsed = useCallback((text: string, type: string) => {
-    const parsed: ParsedScan = parseScan(text);
-    setRawText(text);
-    setScanType(type);
-    setBrand(parsed.brand);
-    setModelNo(parsed.modelNo);
-    setSerialNo(parsed.serialNo);
-    setSaved(false);
-    setSaveError(null);
-    setPhase('confirm');
-  }, []);
+  const applyParsed = useCallback(
+    (text: string, type: string) => {
+      const parsed: ParsedScan = parseScan(text);
+      setRawText(text);
+      setScanType(type);
+      setBrand(parsed.brand);
+      setModelNo(parsed.modelNo);
+      setSerialNo(parsed.serialNo);
+      setSaved(false);
+      setSaveError(null);
+      setPhase('confirm');
+      // Fresh reading per scan (not cached from an earlier one), since the
+      // device may have moved between scans.
+      requestLocation();
+    },
+    [requestLocation]
+  );
 
   const startQrLoop = useCallback(() => {
     stopQrLoop();
@@ -173,6 +212,9 @@ export default function ScannerScreen() {
           serialNo: serialNo.trim(),
           rawScan: rawText,
           scanType,
+          deviceId,
+          latitude: coords?.latitude ?? null,
+          longitude: coords?.longitude ?? null,
         }),
       });
       if (!res.ok) {
@@ -185,7 +227,7 @@ export default function ScannerScreen() {
     } finally {
       setSaving(false);
     }
-  }, [brand, modelNo, serialNo, rawText, scanType]);
+  }, [brand, modelNo, serialNo, rawText, scanType, deviceId, coords]);
 
   return (
     <main className="scanner-page">
@@ -269,6 +311,23 @@ export default function ScannerScreen() {
           </div>
 
           <div className="raw-box">Raw: {rawText}</div>
+
+          <p className="status-text">
+            {locating && 'Getting location…'}
+            {!locating && coords && `Location: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`}
+            {!locating && !coords && !locationError && 'Location not captured.'}
+            {!locating && locationError && (
+              <span className="status-text error">Location unavailable: {locationError}</span>
+            )}
+            {!locating && (
+              <>
+                {' '}
+                <button type="button" className="link-button" onClick={requestLocation}>
+                  Retry
+                </button>
+              </>
+            )}
+          </p>
 
           {saveError && <p className="status-text error">{saveError}</p>}
           {saved && <p className="status-text">Saved to the admin panel.</p>}

@@ -8,6 +8,9 @@ interface ScanRow {
   serial_no: string;
   raw_scan: string | null;
   scan_type: string;
+  device_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -19,8 +22,18 @@ function toScan(row: ScanRow) {
     serialNo: row.serial_no,
     rawScan: row.raw_scan,
     scanType: row.scan_type,
+    deviceId: row.device_id,
+    latitude: row.latitude,
+    longitude: row.longitude,
     createdAt: row.created_at,
   };
+}
+
+// A finite number within valid latitude/longitude range, otherwise null —
+// never trusts client-supplied coordinates blindly into the query.
+function toCoordinate(value: unknown, max: number): number | null {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) && Math.abs(num) <= max ? num : null;
 }
 
 export async function GET(request: NextRequest) {
@@ -28,7 +41,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number(limitParam) || 50, 1), 200);
 
   const rows = (await sql`
-    SELECT id, brand, model_no, serial_no, raw_scan, scan_type, created_at
+    SELECT id, brand, model_no, serial_no, raw_scan, scan_type, device_id, latitude, longitude, created_at
     FROM scans
     ORDER BY created_at DESC
     LIMIT ${limit}
@@ -52,6 +65,9 @@ export async function POST(request: NextRequest) {
   const serialNo = body.serialNo.trim();
   const rawScan = typeof body.rawScan === 'string' ? body.rawScan : null;
   const scanType = typeof body.scanType === 'string' && body.scanType ? body.scanType : 'unknown';
+  const deviceId = typeof body.deviceId === 'string' && body.deviceId.trim() ? body.deviceId.trim() : null;
+  const latitude = toCoordinate(body.latitude, 90);
+  const longitude = toCoordinate(body.longitude, 180);
 
   if (!modelNo || !serialNo) {
     return NextResponse.json(
@@ -61,9 +77,9 @@ export async function POST(request: NextRequest) {
   }
 
   const rows = (await sql`
-    INSERT INTO scans (brand, model_no, serial_no, raw_scan, scan_type)
-    VALUES (${brand}, ${modelNo}, ${serialNo}, ${rawScan}, ${scanType})
-    RETURNING id, brand, model_no, serial_no, raw_scan, scan_type, created_at
+    INSERT INTO scans (brand, model_no, serial_no, raw_scan, scan_type, device_id, latitude, longitude)
+    VALUES (${brand}, ${modelNo}, ${serialNo}, ${rawScan}, ${scanType}, ${deviceId}, ${latitude}, ${longitude})
+    RETURNING id, brand, model_no, serial_no, raw_scan, scan_type, device_id, latitude, longitude, created_at
   `) as ScanRow[];
 
   return NextResponse.json(toScan(rows[0]), { status: 201 });

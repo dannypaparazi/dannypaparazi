@@ -3,7 +3,7 @@
 A device-registration app with two parts, both web-based, in one Next.js app:
 
 - **Admin panel** (`/`) — table of scanned items: brand, model no., serial no.,
-  scan type, and timestamp.
+  scan type, which device scanned it, where it was scanned, and timestamp.
 - **Scanner** (`/scan`) — opens the phone's camera in the browser and identifies
   a device by either:
   - **QR code recognition** (decoded client-side with [jsQR](https://github.com/cozmo/jsQR)), or
@@ -16,6 +16,11 @@ A device-registration app with two parts, both web-based, in one Next.js app:
 - **Install** (`/install`) — a QR code (pointing at `/scan`) plus iPhone/Android
   instructions for adding the scanner to the home screen as an installable app
   (a PWA — no app store). See "Installing on a phone" below.
+
+Each scan also carries **who scanned it and where**: a random device ID is
+generated per phone/browser on first use (no login), and a fresh GPS reading
+is requested each time a code is recognized — see "Device ID and location"
+below.
 
 ## Structure
 
@@ -85,13 +90,30 @@ dev, the actual domain once deployed — plus steps for both platforms:
 
 This works via a standard [Web App Manifest](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest)
 (`app/manifest.ts`) plus a minimal service worker (`public/sw.js`) that caches
-the app shell and always goes to the network for `/api/*`. The result is a
-home-screen icon that opens full-screen (`display: standalone`), no app store
-involved — same web app, just installed.
+only `/scan` and its static assets — **not** the admin dashboard or
+`/install`, since those render live data and must always be fresh. The
+result is a home-screen icon that opens full-screen (`display: standalone`),
+no app store involved — same web app, just installed.
+
+## Device ID and location
+
+- **Device ID**: on first use, the scanner generates a random UUID and saves
+  it in `localStorage` (`lib/deviceId.ts`). It's sent with every scan so the
+  admin panel can group scans by device — there's no login, so this
+  identifies a phone/browser install, not a person. Clearing site data or
+  reinstalling the PWA issues a new one.
+- **Location**: each time a code is recognized, the scanner requests a fresh
+  reading via the browser's Geolocation API and shows it on the confirm
+  screen (with a manual retry if it fails). If the user denies the
+  permission or it's unavailable, the scan still saves — just without
+  coordinates. The admin panel links any captured coordinates to Google Maps.
+
+Both need HTTPS (or `localhost`), same as the camera.
 
 ## API
 
-- `POST /api/scans` — body `{ brand, modelNo, serialNo, rawScan, scanType }`
-  (`brand` optional) → creates a scan record, returns it with `id` and
-  `createdAt`.
+- `POST /api/scans` — body
+  `{ brand, modelNo, serialNo, rawScan, scanType, deviceId, latitude, longitude }`
+  (`brand`, `deviceId`, `latitude`, `longitude` all optional) → creates a scan
+  record, returns it with `id` and `createdAt`.
 - `GET /api/scans?limit=50` — returns the most recent scans, newest first.

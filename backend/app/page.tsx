@@ -9,13 +9,16 @@ interface ScanRow {
   model_no: string;
   serial_no: string;
   scan_type: string;
+  device_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
 async function getScans(): Promise<ScanRow[]> {
   try {
     const rows = await sql`
-      SELECT id, brand, model_no, serial_no, scan_type, created_at
+      SELECT id, brand, model_no, serial_no, scan_type, device_id, latitude, longitude, created_at
       FROM scans
       ORDER BY created_at DESC
       LIMIT 100
@@ -55,6 +58,8 @@ export default async function DashboardPage() {
             <th>Model No.</th>
             <th>Serial No.</th>
             <th>Type</th>
+            <th>Device</th>
+            <th>Location</th>
             <th>Scanned At</th>
           </tr>
         </thead>
@@ -65,6 +70,22 @@ export default async function DashboardPage() {
               <td>{scan.model_no}</td>
               <td>{scan.serial_no}</td>
               <td>{scan.scan_type}</td>
+              <td title={scan.device_id ?? undefined}>
+                {scan.device_id ? scan.device_id.slice(0, 8) : '—'}
+              </td>
+              <td>
+                {scan.latitude != null && scan.longitude != null ? (
+                  <a
+                    href={`https://www.google.com/maps?q=${scan.latitude},${scan.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {scan.latitude.toFixed(5)}, {scan.longitude.toFixed(5)}
+                  </a>
+                ) : (
+                  '—'
+                )}
+              </td>
               <td>{new Date(scan.created_at).toLocaleString()}</td>
             </tr>
           ))}
